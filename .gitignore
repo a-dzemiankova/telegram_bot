@@ -1,0 +1,5 @@
+venv
+db.sql3
+.env
+.idea/
+__pycache__/
