@@ -81,18 +81,18 @@ def get_random_movie():
     return res, chosen_id
 
 
-def get_movies():
+def get_movies(offset=0, limit=5):
     con = sqlite3.connect('db.sql3')
     cur = con.cursor()
-    cur.execute('SELECT * FROM movies')
+    cur.execute('SELECT * FROM movies LIMIT ? OFFSET ?', (limit, offset))
     movies = cur.fetchall()
     global id_to_num
-    id_to_num = {k: v for k, v in zip([el[0] for el in movies], [x for x in range(1, len(movies) + 1)])}
+    id_to_num = {k: v for k, v in zip([el[0] for el in movies], [x for x in range(offset + 1, offset + 1 + len(movies) + 1)])}
     res = ''
     for i, el in enumerate(movies):
         res += f"{id_to_num[el[0]]}. Название: \"{el[1]}\"\nЖанр: {el[2]}\nОписание: {el[3]}\n\n"
         con.close()
-    return res
+    return res, len(movies) > 0
 
 
 def get_movie_id(choice):

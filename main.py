@@ -6,20 +6,22 @@ import os
 from telegram_bot_pagination import InlineKeyboardPaginator
 
 load_dotenv()
-
 secret = os.getenv('TOKEN')
-
 bot = telebot.TeleBot(secret)
 database.create_table()
 # database.add_my_movies()
 
 new_movie = []
+current_page = 0
+last_message_id = None
 
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    global current_page
+    current_page = 0
     markup = types.InlineKeyboardMarkup(row_width=1)
-    btn1 = types.InlineKeyboardButton('Выбрать из библиотеки', callback_data='choose')
+    btn1 = types.InlineKeyboardButton('Выбрать из библиотеки', callback_data='choose_0')
     btn2 = types.InlineKeyboardButton('Добавить новую идею', callback_data='add')
     btn3 = types.InlineKeyboardButton('Случайный фильм', callback_data='random')
     markup.add(btn1, btn2, btn3)
@@ -29,13 +31,34 @@ def send_welcome(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
-    if call.data == 'choose':
-        info = database.get_movies()
+    if call.data == 'choose_0':
+        # info, more = database.get_movies()
         bot.send_message(call.message.chat.id, 'Напишите номер понравившегося фильма:')
+
+    if call.data.startswith('choose'):
+        global current_page, last_message_id
+        page = int(call.data.split('_')[1])
+        offset = page * 5
+        info, more = database.get_movies(offset=offset)
         markup = types.InlineKeyboardMarkup()
+        if page > 0:
+            prev_btn = types.InlineKeyboardButton('<<<<<Предыдущая страница', callback_data=f'choose_{page - 1}')
+            markup.add(prev_btn)
+        if more:
+            next_btn = types.InlineKeyboardButton('Следующая страница>>>>>', callback_data=f'choose_{page + 1}')
+            markup.add(next_btn)
+        else:
+            btn1 = types.InlineKeyboardButton('Вернуться в начало', callback_data='back')
+            markup.add(btn1)
+            bot.send_message(call.message.chat.id, 'Конец списка.', reply_markup=markup)
+            return
+        if last_message_id:
+            bot.delete_message(call.message.chat.id, last_message_id)
+
         btn1 = types.InlineKeyboardButton('Вернуться в начало', callback_data='back')
         markup.add(btn1)
-        bot.send_message(call.message.chat.id, info, reply_markup=markup)
+        sent_message = bot.send_message(call.message.chat.id, info, reply_markup=markup)
+        last_message_id = sent_message.message_id
     if call.data == 'back':
         send_welcome(call.message)
     if call.data == 'add':
