@@ -3,7 +3,7 @@ from telebot import types
 import database
 from dotenv import load_dotenv
 import os
-from telegram_bot_pagination import InlineKeyboardPaginator
+
 
 load_dotenv()
 secret = os.getenv('TOKEN')
@@ -24,18 +24,18 @@ def send_welcome(message):
     btn1 = types.InlineKeyboardButton('Выбрать из библиотеки', callback_data='choose_0')
     btn2 = types.InlineKeyboardButton('Добавить новую идею', callback_data='add')
     btn3 = types.InlineKeyboardButton('Случайный фильм', callback_data='random')
-    markup.add(btn1, btn2, btn3)
+    btn4 = types.InlineKeyboardButton('Поиск по жанру', callback_data='genre')
+    markup.add(btn1, btn2, btn3, btn4)
     bot.send_message(message.chat.id, "Привет! Я помогу тебе выбрать, что посмотреть. Что ты хочешь сделать?",
                      reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
-    if call.data == 'choose_0':
-        # info, more = database.get_movies()
-        bot.send_message(call.message.chat.id, 'Напишите номер понравившегося фильма:')
-
     if call.data.startswith('choose'):
+        if call.data == 'choose_0':
+            bot.send_message(call.message.chat.id, 'Напишите номер понравившегося фильма:')
+            bot.register_next_step_handler(call.message, choose_movie)
         global current_page, last_message_id
         page = int(call.data.split('_')[1])
         offset = page * 5
@@ -59,6 +59,7 @@ def callback_handler(call):
         markup.add(btn1)
         sent_message = bot.send_message(call.message.chat.id, info, reply_markup=markup)
         last_message_id = sent_message.message_id
+
     if call.data == 'back':
         send_welcome(call.message)
     if call.data == 'add':
@@ -86,11 +87,32 @@ def callback_handler(call):
         btn2 = types.InlineKeyboardButton('Удалить фильм из библиотеки', callback_data=f'delete_{chosen_id}')
         markup.add(btn1, btn2)
         bot.send_message(call.message.chat.id, f"Вы выбрали \"{movie}\". Приятного просмотра!", reply_markup=markup)
+    if call.data == 'genre':
+        bot.send_message(call.message.chat.id, 'Напишите тип фильма (сериал, мультфильм, детектив и т.п.)')
+        bot.register_next_step_handler(call.message, handle_genre_input)
+
+
+@bot.message_handler(content_types=['text'])
+def handle_genre_input(message):
+    genre = message.text.strip().lower()
+    info = database.choose_genre(genre)
+    markup = types.InlineKeyboardMarkup()
+    btn1 = types.InlineKeyboardButton('Вернуться в начало', callback_data='back')
+    btn2 = types.InlineKeyboardButton('Выбрать другой жанр', callback_data='genre')
+    markup.add(btn1, btn2)
+
+    bot.send_message(message.chat.id, info, reply_markup=markup)
+    bot.register_next_step_handler(message, choose_movie_by_id)
+
+
+# @bot.message_handler(content_types=['text'])
+def choose_movie_by_id(message):
+    bot.register_next_step_handler(message, choose_movie)
 
 
 @bot.message_handler(content_types=['text'])
 def choose_movie(message):
-    chosen_id = int(message.text)
+    chosen_id = database.get_id_value(int(message.text))
     try:
         movie = database.get_movie_id(chosen_id)
         if movie:

@@ -4,9 +4,9 @@ import random
 id_to_num = dict()
 
 
-
 def get_id_value(choice):
     global id_to_num
+    # id_to_num = {k: v for k, v in zip([el[0] for el in movies], [x for x in range(1, len(movies) + 1)])}
     chosen_id = 0
     for k, v in id_to_num.items():
         if v == choice:
@@ -98,8 +98,7 @@ def get_movies(offset=0, limit=5):
 def get_movie_id(choice):
     con = sqlite3.connect('db.sql3')
     cur = con.cursor()
-    chosen_id = get_id_value(choice)
-    cur.execute('SELECT name FROM movies WHERE id=?', (chosen_id, ))
+    cur.execute('SELECT name FROM movies WHERE id=?', (choice, ))
     movie = cur.fetchone()
     con.close()
     return movie[0] if movie else None
@@ -116,8 +115,23 @@ def add_new_movie(lst):
 def delete_movie(choice):
     con = sqlite3.connect('db.sql3')
     cur = con.cursor()
-    chosen_id = get_id_value(choice)
-    cur.execute('DELETE FROM movies WHERE id == ?', (chosen_id,))
+    cur.execute('DELETE FROM movies WHERE id == ?', (choice,))
     con.commit()
     con.close()
 
+
+def choose_genre(genre):
+    con = sqlite3.connect('db.sql3')
+    cur = con.cursor()
+    cur.execute("SELECT * FROM movies WHERE type LIKE ? ", ('%' + genre + '%',))
+    movies = cur.fetchall()
+    con.close()
+    global id_to_num
+    id_to_num = {k: v for k, v in zip([el[0] for el in movies], [x for x in range(1, len(movies) + 1)])}
+    if movies:
+        res = ''
+        for i, el in enumerate(movies):
+            res += f"{id_to_num[el[0]]}. Название: \"{el[1]}\"\nЖанр: {el[2]}\nОписание: {el[3]}\n\n"
+        return res
+    else:
+        return "Фильмы указанного жанра не найдены."
